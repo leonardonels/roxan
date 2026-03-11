@@ -1,0 +1,18 @@
+services:
+    crafty:
+        container_name: crafty_container
+        image: registry.gitlab.com/crafty-controller/crafty-4:latest
+        restart: always
+        environment:
+            - TZ='Europe/Rome'
+        ports:
+            - "25443:8443" # HTTPS
+            - "25123:8123" # DYNMAP
+            - "19132:19132/udp" # BEDROCK
+            - "25500-25600:25500-25600" # MC SERV PORT RANGE
+        volumes:
+            - /opt/docker/roxan/data/crafty/backups:/crafty/backups
+            - /opt/docker/roxan/data/crafty/logs:/crafty/logs
+            - /opt/docker/roxan/data/crafty/servers:/crafty/servers
+            - /opt/docker/roxan/data/crafty/config:/crafty/app/config
+            - /opt/docker/roxan/data/crafty/import:/crafty/import

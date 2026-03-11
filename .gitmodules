@@ -32,3 +32,6 @@
 [submodule "compose/gpu-hot"]
 	path = compose/gpu-hot
 	url = https://github.com/leonardonels/gpu-hot.git
+[submodule "docs/playit"]
+	path = docs/playit
+	url = https://github.com/playit-cloud/playit-agent.git
