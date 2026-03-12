@@ -4,6 +4,8 @@ This repository contains the configuration and reference files for my personal h
 
 ## Table of Contents
  - [System Specifications](#system-specifications)
+ - [Initial Server Setup from scratch](#initial-server-setup-from-scratch)
+ - [Quick deployment guide](#quick-deployment-guide)
  - [Containers](#containers)
    - [Cloudflared](#cloudflared)
    - [Crafty - Minecraft](#crafty)
@@ -67,13 +69,38 @@ If you are setting up `roxan` on a fresh machine, follow these steps before depl
    sudo usermod -aG docker $USER
    ```
    *(Log out and log back in for the Docker group changes to take effect).*
-4. **Prepare the Directory Structure:**
+4. **Install NVIDIA Drivers & Container Toolkit:**
+   ```bash
+   # Install the appropriate NVIDIA driver (ubuntu-drivers will auto-install the recommended one)
+   sudo apt install -y ubuntu-drivers-common
+   sudo ubuntu-drivers autoinstall
+
+   # Add the NVIDIA Container Toolkit repository
+   curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+   curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \
+     sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
+     sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+
+   sudo apt-get update
+   sudo apt-get install -y nvidia-container-toolkit
+
+   # Configure Docker to use the NVIDIA runtime
+   sudo nvidia-ctk runtime configure --runtime=docker
+   sudo systemctl restart docker
+   ```
+   *(A system reboot may be required after installing the NVIDIA driver).*
+5. **Install Tailscale (VPN):**
+   ```bash
+   curl -fsSL https://tailscale.com/install.sh | sh
+   sudo tailscale up
+   ```
+6. **Prepare the Directory Structure:**
    ```bash
    sudo mkdir -p /opt/docker
    sudo chown -R $USER:$USER /opt/docker
    cd /opt/docker
    ```
-5. **Clone the Repository:**
+7. **Clone the Repository:**
    ```bash
    git clone https://github.com/leonardonels/roxan.git
    cd roxan
