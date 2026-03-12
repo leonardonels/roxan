@@ -1,0 +1,22 @@
+services:
+  ai-lab:
+    build: .
+    container_name: scalable-ai-lab
+    restart: unless-stopped
+    stdin_open: true
+    tty: true
+    volumes:
+      - /opt/docker/roxan/data/cuda:/workspace
+    working_dir: /workspace
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+    ports:
+      - "8888:8888"
+      - "6006:6006"

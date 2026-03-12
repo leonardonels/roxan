@@ -194,6 +194,10 @@ pages:
                 name: GPU Hot
                 icon: si:docker
                 hide: false
+              scalable-ai-lab:
+                name: AI powered by Nvidia
+                icon: si:nvidia
+                hide: false
 
   - name: Weather
     columns:
