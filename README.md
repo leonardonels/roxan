@@ -4,22 +4,22 @@ This repository contains the configuration and reference files for my personal h
 
 ## Table of Contents
  - [System Specifications](#system-specifications)
- - [Containers](#containers)
-   - [Cloudflared](#cloudflared)
-   - [Crafty](#crafty)
-   - [CUDA](#cuda)
-   - [FloraTech](#floratech)
-   - [Glance](#glance)
-   - [GPU Hot](#gpu-hot)
-   - [Immich App](#immich-app)
-   - [InvokeAI](#invokeai)
-   - [n8n](#n8n)
-   - [Nextcloud](#nextcloud)
-   - [Ollama](#ollama)
-   - [Pi-hole](#pi-hole)
-   - [Playit](#playit)
-   - [Portainer IO](#portainer-io)
-   - [Vaultwarden](#vaultwarden)
+ 
+ - [Cloudflared](#cloudflared)
+ - [Crafty](#crafty)
+ - [CUDA](#cuda)
+ - [FloraTech](#floratech)
+ - [Glance](#glance)
+ - [GPU Hot](#gpu-hot)
+ - [Immich App](#immich-app)
+ - [InvokeAI](#invokeai)
+ - [n8n](#n8n)
+ - [Nextcloud](#nextcloud)
+ - [Ollama](#ollama)
+ - [Pi-hole](#pi-hole)
+ - [Playit](#playit)
+ - [Portainer IO](#portainer-io)
+ - [Vaultwarden](#vaultwarden)
 
 ## System Specifications
 
