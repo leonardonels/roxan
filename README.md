@@ -3,8 +3,8 @@
 This repository contains the configuration and reference files for my personal homelab, `roxan`. It is based on an Ubuntu 24.04 LTS server running Docker. The typical deployment location on the server is `/opt/docker/roxan/`.
 
 ## Table of Contents
-1. [System Specifications](#system-specifications)
-2. [Containers](#containers)
+ - [System Specifications](#system-specifications)
+ - [Containers](#containers)
    - [Cloudflared](#cloudflared)
    - [Crafty](#crafty)
    - [CUDA](#cuda)
