@@ -35,8 +35,61 @@ GPU 2:  NVIDIA GeForce RTX 2080 Ti Rev. A
 Memory: 32 GB (31990MiB)
 ```
 
-## Containers
+### Initial Server Setup (From Scratch)
 
+If you are setting up `roxan` on a fresh machine, follow these steps before deploying any containers:
+
+1. **Install OS:** Install **Ubuntu 24.04 LTS** on the host machine.
+2. **Update System:** 
+   ```bash
+   sudo apt update && sudo apt dist-upgrade -y
+   ```
+3. **Install Docker (Official Guide) & Dependencies:**
+   ```bash
+   # Add Docker's official GPG key:
+   sudo apt-get update
+   sudo apt-get install -y ca-certificates curl git build-essential
+   sudo install -m 0755 -d /etc/apt/keyrings
+   sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+   sudo chmod a+r /etc/apt/keyrings/docker.asc
+
+   # Add the repository to Apt sources:
+   echo \
+     "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
+     $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+     sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+   sudo apt-get update
+
+   # Install Docker packages:
+   sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+   # Post-installation steps for Linux (manage Docker as a non-root user)
+   sudo usermod -aG docker $USER
+   ```
+   *(Log out and log back in for the Docker group changes to take effect).*
+4. **Prepare the Directory Structure:**
+   ```bash
+   sudo mkdir -p /opt/docker
+   sudo chown -R $USER:$USER /opt/docker
+   cd /opt/docker
+   ```
+5. **Clone the Repository:**
+   ```bash
+   git clone https://github.com/leonardonels/roxan.git
+   cd roxan
+   ```
+
+### Quick Deployment Guide
+To deploy any of the containers listed below, navigate to its respective directory inside the `compose/` folder and run Docker Compose.
+
+For example, to start Pi-hole:
+```bash
+cd compose/pi-hole
+docker compose up -d
+```
+*Note: Some containers may require `.env` files, specific directory structures in the `data/` folder, or initial configuration adjustments before they can start successfully.*
+
+## Containers
 Below is a brief description of each container/stack managed in this repository, located in the `compose/` directory.
 
 ### Cloudflared
