@@ -22,6 +22,7 @@ This repository contains the configuration and reference files for my personal h
    - [Playit - Minecraft Tunnel](#playit)
    - [Portainer IO](#portainer-io)
    - [Vaultwarden](#vaultwarden)
+   - 
 
 ## System Specifications
 
@@ -184,3 +185,8 @@ A lightweight management UI to easily manage Docker environments, containers, ne
 ### Vaultwarden
 An unofficial Bitwarden compatible server written in Rust, perfect for self-hosting a password manager.
 - **Image**: `vaultwarden/server:latest`
+
+### SAM3 Test Container
+A fast and easy container to test Meta's SAM3 AI Model
+- **Image**: Custom (`build: .`)
+- **Dockerfile contents**: Built from `pytorch/pytorch:2.7.0-cuda12.6-cudnn9-devel` with requirements from the offical SAM3 repo.
