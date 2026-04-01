@@ -33,3 +33,7 @@ data/immich-app/*
 data/n8n/*
 !data/n8n/data/.gitkeep
 !data/n8n/files/.gitkeep
+
+# sam3 - quick toy container
+data/sam3/*
+!data/san3/.gitkeep
