@@ -6,6 +6,7 @@ This repository contains the configuration and reference files for my personal h
  - [System Specifications](#system-specifications)
  - [Initial Server Setup from scratch](#initial-server-setup-from-scratch)
  - [Quick deployment guide](#quick-deployment-guide)
+ - [Maintenance (auto-updates & keep-alive)](#maintenance)
  - [Containers](#containers)
    - [Cloudflared](#cloudflared)
    - [Crafty - Minecraft](#crafty)
@@ -18,6 +19,8 @@ This repository contains the configuration and reference files for my personal h
    - [n8n](#n8n)
    - [Nextcloud](#nextcloud)
    - [Ollama - Nextcloud helper service](#ollama)
+   - [OpenLinkHub - Corsair cooler](#openlinkhub)
+   - [OpenRGB - GPU lighting](#openrgb)
    - [Pi-hole](#pi-hole)
    - [Playit - Minecraft Tunnel](#playit)
    - [Portainer IO](#portainer-io)
@@ -106,6 +109,10 @@ If you are setting up `roxan` on a fresh machine, follow these steps before depl
    git clone https://github.com/leonardonels/roxan.git
    cd roxan
    ```
+8. **Install the maintenance timers** (auto-updates, keep-alive, NVIDIA 580 pin), see [Maintenance](#maintenance):
+   ```bash
+   sudo ./scripts/install.sh
+   ```
 
 ### Quick Deployment Guide
 To deploy any of the containers listed below, navigate to its respective directory inside the `compose/` folder and run Docker Compose.
@@ -116,6 +123,14 @@ cd compose/pi-hole
 docker compose up -d
 ```
 *Note: Some containers may require `.env` files, specific directory structures in the `data/` folder, or initial configuration adjustments before they can start successfully.*
+
+## Maintenance
+`scripts/` keeps the server alive and up to date unattended, with status shown in Glance:
+- **System update** (Sun 03:30): `apt full-upgrade` with the NVIDIA driver pinned to the 580 branch (last one with Pascal support), reboot when needed.
+- **Docker update** (Sun 05:00): pulls and recreates every running compose project, with automatic rollback when a project doesn't come back healthy.
+- **Healthcheck** (every 5 min): restarts unhealthy containers, a hung docker daemon, tailscale, networking; cleans up when the disk fills.
+
+See [scripts/README.md](scripts/README.md) for the details.
 
 ## Containers
 Below is a brief description of each container/stack managed in this repository, located in the `compose/` directory.
@@ -131,7 +146,7 @@ A control panel for managing Minecraft servers, allowing easy deployment and adm
 ### CUDA
 Docker environment configured with NVIDIA toolkit for running CUDA workloads, leveraging the RTX 2080 Ti.
 - **Image**: Custom (`build: .`)
-- **Dockerfile contents**: Built from `nvidia/cuda:12.8.0-devel-ubuntu24.04`, installed with Python 3, PyTorch with GPU-optimized packages, OpenMPI, and general development tools. Sets `utf-8` locale explicitly.
+- **Dockerfile contents**: Built from `nvidia/cuda:12.8.0-devel-ubuntu24.04`, installed with Python 3, PyTorch from the cu126 index (keeps Pascal/GTX 1080 Ti support), OpenMPI, and general development tools. Sets `utf-8` locale explicitly.
 
 ### FloraTech
 Custom project or service.
@@ -156,7 +171,8 @@ A very fast, self-hosted photo and video backup solution directly from your mobi
 
 ### InvokeAI
 A powerful creative engine for Stable Diffusion models, providing a UI for AI image generation.
-- **Image**: `ghcr.io/invoke-ai/invokeai:latest`
+- **Image**: Custom (`build: .`)
+- **Dockerfile contents**: `ghcr.io/invoke-ai/invokeai:latest` with its torch/torchvision reinstalled from PyTorch's cu126 index (same versions), since the official CUDA 12.8 build doesn't support the Pascal GTX 1080 Ti. Rebuilt by the weekly docker update.
 
 ### n8n
 An extendable workflow automation tool for connecting different services and APIs.
@@ -169,6 +185,14 @@ A self-hosted productivity platform for file storage, sharing, and collaboration
 ### Ollama
 A tool to run, manage, and interact with large language models locally.
 - **Image**: `ollama/ollama`
+
+### OpenLinkHub
+Open-source iCUE replacement driving the Corsair iCUE LINK H100i (pump + 2× QX RGB fans) through the iCUE LINK System Hub: LEDs, speed profiles (all channels on `Quiet`), live RPM/temperature readout. Web UI and API on port `27003` (no authentication, LAN/Tailscale only); the Glance "Cooler" widget and `scripts/healthcheck.sh` read it. Tested 2026-10-24: on a clean stop (`docker stop`, shutdown) the hub immediately falls back to its built-in out-of-the-box mode (speeds and LEDs); after a crash (`kill -9`) its LEDs freeze and it falls back on its own after a short timeout. Cooling never depends on the container.
+- **Image**: Custom (`build:` from the upstream repo, pinned to release `0.9.2`)
+
+### OpenRGB
+Sets the EVGA GTX 1080 Ti FTW3 LEDs (Nameplate + Backplate zones, static colour or off; the three iCX GPU/MEM/PWR status LEDs aren't controllable) at every start and every 6 h, since the card can't store a colour. Colours are set per zone by `COLORS` in the compose file (`000000` = off; OpenRGB's "Off" mode does nothing on this card). Runs without network, may open only I2C devices, and `data/openrgb/OpenRGB.json` enables only the FTW3 detector, so it never touches the Corsair hub.
+- **Image**: Custom (`build: .`): official OpenRGB 1.0 Debian packages (checksum-pinned) on `debian:bookworm-slim`
 
 ### Pi-hole
 A network-wide DNS sinkhole that protects devices from unwanted content and tracks without installing any client-side software.

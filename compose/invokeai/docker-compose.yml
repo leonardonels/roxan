@@ -1,7 +1,9 @@
 # Copyright (c) 2023 Eugene Brodsky https://github.com/ebr
 
 x-invokeai: &invokeai
-    image: "ghcr.io/invoke-ai/invokeai:latest"
+    # Official image with PyTorch swapped for its Pascal-capable cu126 build, see Dockerfile.
+    image: invokeai-pascal:latest
+    build: .
     # build:
     #  context: ..
     #  dockerfile: docker/Dockerfile

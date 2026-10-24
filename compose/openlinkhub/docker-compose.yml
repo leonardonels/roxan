@@ -1,0 +1,35 @@
+services:
+  openlinkhub:
+    # Open-source iCUE replacement for the Corsair iCUE LINK System Hub (AIO pump, fans, LEDs).
+    # Built from the upstream Dockerfile at a pinned release; to upgrade, bump the tag and
+    # `docker compose up -d --build`.
+    build:
+      context: https://github.com/jurkovic-nikola/OpenLinkHub.git#0.9.2
+    image: openlinkhub:0.9.2
+    container_name: openlinkhub
+    restart: unless-stopped
+    # Talks to the hub over hidraw. /dev is mounted (not just privileged's snapshot of it) so
+    # the hub is found again if it re-enumerates on USB while the container runs.
+    privileged: true
+    volumes:
+      - /dev:/dev
+      - /run/udev:/run/udev:ro
+      - /opt/docker/roxan/data/openlinkhub/config.json:/opt/OpenLinkHub/config.json
+      - /opt/docker/roxan/data/openlinkhub/database/scheduler.json:/opt/OpenLinkHub/database/scheduler.json
+      - /opt/docker/roxan/data/openlinkhub/database/profiles:/opt/OpenLinkHub/database/profiles
+      - /opt/docker/roxan/data/openlinkhub/database/rgb:/opt/OpenLinkHub/database/rgb
+      - /opt/docker/roxan/data/openlinkhub/database/temperatures:/opt/OpenLinkHub/database/temperatures
+      - /opt/docker/roxan/data/openlinkhub/database/led:/opt/OpenLinkHub/database/led
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      # Web UI + API (no authentication): LAN and Tailscale only, never route it through cloudflared.
+      - 27003:27003
+    # On SIGTERM it switches the hub back to its built-in hardware curve before exiting; if it
+    # dies without that (kill -9), the hub reverts on its own after a short timeout (tested).
+    stop_grace_period: 30s
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/27003"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s

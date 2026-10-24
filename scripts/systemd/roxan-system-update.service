@@ -1,0 +1,12 @@
+[Unit]
+Description=roxan: apt upgrade (NVIDIA kept on its branch) and reboot if needed
+Documentation=file://@ROXAN_ROOT@/scripts/README.md
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=@ROXAN_ROOT@/scripts/system-update.sh
+TimeoutStartSec=3h
+# dpkg must never be killed half way.
+KillMode=process

@@ -1,0 +1,9 @@
+# Installed by scripts/install.sh as /etc/apt/preferences.d/roxan-nvidia.
+# Stay on the NVIDIA 580 branch, the last one supporting Pascal: every package of a newer
+# branch (590, 595, 610, ... nvidia-driver-590, libnvidia-gl-595, linux-modules-nvidia-610-generic,
+# nvidia-firmware-590-590.48.01, ...) gets no install candidate. 580.x point releases still flow.
+# Globs rather than a /regex/: a regex here makes every apt invocation ~10 s slower.
+Explanation: keep the NVIDIA driver on the 580 branch
+Package: *nvidia*-59[0-9] *nvidia*-59[0-9]-* *nvidia*-6[0-9][0-9] *nvidia*-6[0-9][0-9]-* *nvidia*-7[0-9][0-9] *nvidia*-7[0-9][0-9]-*
+Pin: release *
+Pin-Priority: -1

@@ -1,0 +1,23 @@
+services:
+  scrutiny:
+    restart: unless-stopped
+    container_name: scrutiny
+    image: ghcr.io/analogj/scrutiny:nightly-omnibus
+    cap_add:
+      - SYS_RAWIO
+      - SYS_ADMIN
+    ports:
+      - "8880:8080" # webapp
+      - "8886:8086" # influxDB admin
+    volumes:
+      - /run/udev:/run/udev:ro
+      - /opt/docker/roxan/data/scrutiny/config:/opt/scrutiny/config
+      - /opt/docker/roxan/data/scrutiny/influxdb:/opt/scrutiny/influxdb
+    devices:
+      - "/dev/sda"
+      - "/dev/sdb"
+      - "/dev/sdc"
+      - "/dev/nvme0n1"
+      - "/dev/nvme0"
+      - "/dev/nvme1n1"
+      - "/dev/nvme1"

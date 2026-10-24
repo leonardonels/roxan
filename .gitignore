@@ -1,5 +1,11 @@
-# Environment variables
+# Environment variables (secrets: tunnel tokens, DB passwords, ...)
 *.env
+
+# Editor swap/backup files
+*.swp
+*.swo
+*~
+*.bak
 
 # pi-hole data
 data/pi-hole/*
@@ -36,4 +42,32 @@ data/n8n/*
 
 # sam3 - quick toy container
 data/sam3/*
-!data/san3/.gitkeep
+!data/sam3/.gitkeep
+
+# CUDA AI lab workspace (mounted as /workspace)
+data/cuda/*
+!data/cuda/README.md
+
+# FloraTech checkout
+data/floratech/repo/*
+!data/floratech/repo/.gitkeep
+
+# mmr ROS workspace (sources + build output, ~1 GB)
+data/mmr/*
+!data/mmr/.gitkeep
+
+# Scrutiny SMART database and InfluxDB (root-owned)
+data/scrutiny/*
+!data/scrutiny/.gitkeep
+
+# OpenLinkHub: keep the config, not the state it rewrites at runtime (profiles, RGB, LED, cluster)
+data/openlinkhub/database/*
+!data/openlinkhub/database/scheduler.json
+
+# OpenRGB: keep the config (detector allowlist), not logs/profiles
+data/openrgb/*
+!data/openrgb/OpenRGB.json
+
+# maintenance scripts: notification secrets and the generated Glance status
+scripts/roxan.env
+data/glance/assets/roxan-status.json

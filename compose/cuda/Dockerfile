@@ -31,12 +31,12 @@ ENV LC_ALL=en_US.UTF-8
 RUN ln -s /usr/bin/python3 /usr/bin/python
 
 # Install AI Libraries (PyTorch) & MPI
-# We use the official PyTorch index to get the GPU-optimized version
+# PyTorch comes only from its cu126 index: the cu128+ builds (PyPI's default) dropped Pascal
+# (sm_61, the GTX 1080 Ti). Don't add PyPI as an extra index here, or pip picks those again.
 RUN pip install --no-cache-dir --break-system-packages \
     torch torchvision torchaudio \
-    --index-url https://download.pytorch.org/whl/cu124 \
-    --extra-index-url https://pypi.org/simple \
-    mpi4py
+    --index-url https://download.pytorch.org/whl/cu126
+RUN pip install --no-cache-dir --break-system-packages mpi4py
 
 WORKDIR /workspace
 

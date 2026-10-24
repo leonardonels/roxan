@@ -60,7 +60,7 @@ pages:
                 url: https://hot.leonardonels.com/
                 icon: https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/nvidia.png
               - title: S.M.A.R.T. Monitor
-                url: https://smart.leonardonels.com/
+                url: https://scrutiny.leonardonels.com/
                 icon: https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/terminal.png
               - title: open-ai
                 url: https://openai.leonardonels.com/
@@ -71,9 +71,65 @@ pages:
               - title: floratech
                 url: https://floratech.leonardonels.com/
                 icon: https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fwebstockreview.net%2Fimages%2Fplants-clipart-emoji-3.png&f=1&nofb=1&ipt=04771143245d27c08807b1516957ea70c5b85f741f49b033da2576758651844c
+              - title: openlinkhub
+                url: http://192.168.178.49:27003/
+                icon: si:corsair
 
       - size: full
         widgets:
+          # Written by scripts/{docker-update,system-update,healthcheck}.sh, see scripts/README.md.
+          - type: custom-api
+            title: Roxan maintenance
+            cache: 1m
+            url: http://127.0.0.1:8080/assets/roxan-status.json
+            template: |
+              {{ define "state" }}{{ if eq . "ok" }}color-positive{{ else if or (eq . "running") (eq . "rebooting") (eq . "repaired") }}color-highlight{{ else }}color-negative{{ end }}{{ end }}
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px;">
+                <div>
+                  {{ $s := .JSON.String "docker.state" }}
+                  <div class="size-h5 color-subdue">DOCKER UPDATES</div>
+                  <div class="size-h2 {{ template "state" $s }}">{{ if $s }}{{ $s }}{{ else }}never run{{ end }}</div>
+                  {{ if .JSON.Exists "docker.finished" }}
+                  <div class="size-h6 color-subdue">last run <span {{ .JSON.String "docker.finished" | parseTime "RFC3339" | toRelativeTime }}></span> ago · {{ .JSON.Int "docker.duration_s" }}s</div>
+                  {{ end }}
+                  <ul class="list list-gap-2 margin-top-10 size-h6">
+                    <li>{{ len (.JSON.Array "docker.current") }} up to date</li>
+                    {{ if .JSON.Array "docker.updated" }}<li class="color-positive">updated: {{ range .JSON.Array "docker.updated" }}{{ .String "" }} {{ end }}</li>{{ end }}
+                    {{ if .JSON.Array "docker.rolled_back" }}<li class="color-negative">rolled back: {{ range .JSON.Array "docker.rolled_back" }}{{ .String "" }} {{ end }}</li>{{ end }}
+                    {{ range .JSON.Array "docker.failed" }}<li class="color-negative">{{ .String "" }}</li>{{ end }}
+                    {{ range .JSON.Array "docker.skipped" }}<li class="color-subdue">{{ .String "" }}</li>{{ end }}
+                  </ul>
+                </div>
+                <div>
+                  {{ $s := .JSON.String "system.state" }}
+                  <div class="size-h5 color-subdue">SYSTEM UPDATES</div>
+                  <div class="size-h2 {{ template "state" $s }}">{{ if $s }}{{ $s }}{{ else }}never run{{ end }}</div>
+                  {{ if .JSON.Exists "system.finished" }}
+                  <div class="size-h6 color-subdue">last run <span {{ .JSON.String "system.finished" | parseTime "RFC3339" | toRelativeTime }}></span> ago · {{ len (.JSON.Array "system.upgraded") }} packages</div>
+                  {{ end }}
+                  <ul class="list list-gap-2 margin-top-10 size-h6">
+                    <li>kernel {{ .JSON.String "system.kernel" }}</li>
+                    <li>NVIDIA {{ .JSON.String "system.nvidia_installed" }}{{ if ne (.JSON.String "system.nvidia_loaded") (.JSON.String "system.nvidia_installed") }} <span class="color-negative">(loaded {{ .JSON.String "system.nvidia_loaded" }})</span>{{ end }}</li>
+                    {{ if .JSON.String "system.reboot_pending" }}<li class="color-highlight">reboot pending: {{ .JSON.String "system.reboot_pending" }}</li>{{ end }}
+                    {{ range .JSON.Array "system.problems" }}<li class="color-negative">{{ .String "" }}</li>{{ end }}
+                    {{ if .JSON.Exists "reboot.at" }}<li class="color-subdue">last auto-reboot <span {{ .JSON.String "reboot.at" | parseTime "RFC3339" | toRelativeTime }}></span> ago: {{ .JSON.String "reboot.reason" }}</li>{{ end }}
+                  </ul>
+                </div>
+                <div>
+                  {{ $s := .JSON.String "health.state" }}
+                  <div class="size-h5 color-subdue">HEALTH</div>
+                  <div class="size-h2 {{ template "state" $s }}">{{ if $s }}{{ $s }}{{ else }}no data{{ end }}</div>
+                  {{ if .JSON.Exists "health.checked" }}
+                  <div class="size-h6 color-subdue">checked <span {{ .JSON.String "health.checked" | parseTime "RFC3339" | toRelativeTime }}></span> ago · up {{ .JSON.String "health.uptime" }}</div>
+                  {{ end }}
+                  <ul class="list list-gap-2 margin-top-10 size-h6">
+                    {{ range .JSON.Array "health.issues" }}<li class="color-negative">{{ .String "" }}</li>{{ end }}
+                    {{ if .JSON.Bool "health.reboot_required" }}<li class="color-highlight">reboot required</li>{{ end }}
+                    {{ if .JSON.Exists "health.last_repair" }}<li class="color-subdue">last repair <span {{ .JSON.String "health.last_repair" | parseTime "RFC3339" | toRelativeTime }}></span> ago: {{ range .JSON.Array "health.last_repair_actions" }}{{ .String "" }}; {{ end }}</li>{{ end }}
+                  </ul>
+                </div>
+              </div>
+
           - type: split-column
             widgets:
               - type: lobsters
@@ -140,6 +196,28 @@ pages:
                     hide: false
                     name: massive-storage
 
+          # Corsair iCUE LINK H100i via OpenLinkHub (compose/openlinkhub). Web UI: http://192.168.178.49:27003
+          - type: custom-api
+            title: Cooler
+            title-url: http://192.168.178.49:27003
+            cache: 30s
+            url: http://192.168.178.49:27003/api/devices/8335B5AC4416625EAD27AC1494DD02BD
+            template: |
+              <ul class="list list-gap-10">
+              {{ range .JSON.Array "device.devices.@values" }}
+                <li class="flex justify-between items-center">
+                  <div>
+                    <div class="size-h4 color-highlight">{{ if .Bool "AIO" }}Pump · liquid{{ else }}{{ .String "name" | trimPrefix "iCUE LINK " }} fan{{ end }}</div>
+                    <div class="size-h6 color-subdue">{{ .String "profile" }} profile</div>
+                  </div>
+                  <div class="text-right">
+                    <div class="size-h4 {{ if and (.Bool "AIO") (lt (.Int "rpm") 500) }}color-negative{{ end }}">{{ .Int "rpm" }} rpm</div>
+                    <div class="size-h6 {{ if and (.Bool "AIO") (ge (.Float "temperature") 50.0) }}color-negative{{ end }}">{{ printf "%.1f" (.Float "temperature") }} °C</div>
+                  </div>
+                </li>
+              {{ end }}
+              </ul>
+
           - type: docker-containers
             hide-by-default: true
             containers:
@@ -198,52 +276,16 @@ pages:
                 name: AI powered by Nvidia
                 icon: si:nvidia
                 hide: false
+              scrutiny:
+                name: S.M.A.R.T.
+                icon: si:speedtest
+                hide: false
+              openlinkhub:
+                name: Corsair iCUE
+                icon: si:corsair
+                hide: false
+              openrgb:
+                name: FTW3 LED Control
+                icon: auto-invert /assets/openrgb-flat.png
+                hide: false
 
-  - name: Weather
-    columns:
-      - size: full
-        widgets:
-          - type: split-column
-            max-columns: 4
-            widgets:
-              - type: weather
-                location: Pievepelago, Italy
-                units: metric
-                hour-format: 24h
-                # Optionally hide the location from being displayed in the widget
-                # hide-location: true
-
-              - type: weather
-                location: Pavullo, Italy
-                units: metric
-                hour-format: 24h
-                # Optionally hide the location from being displayed in the widget
-                # hide-location: true
-
-              - type: weather
-                location: Abetone, Italy
-                units: metric
-                hour-format: 24h
-                # Optionally hide the location from being displayed in the widget
-                # hide-location: true
-
-              - type: weather
-                location: Passo del Cerreto, Italy
-                units: metric
-                hour-format: 24h
-                # Optionally hide the location from being displayed in the widget
-                # hide-location: true
-
-              - type: weather
-                location: Passo della Futa, Italy
-                units: metric
-                hour-format: 24h
-                # Optionally hide the location from being displayed in the widget
-                # hide-location: true
-
-              - type: weather
-                location: Stilfser Joch, Italy
-                units: metric
-                hour-format: 24h
-                # Optionally hide the location from being displayed in the widget
-                # hide-location: true

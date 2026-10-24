@@ -1,0 +1,9 @@
+[Unit]
+Description=roxan: keep-alive healthcheck
+Documentation=file://@ROXAN_ROOT@/scripts/README.md
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=@ROXAN_ROOT@/scripts/healthcheck.sh
+TimeoutStartSec=15min

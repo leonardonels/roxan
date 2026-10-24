@@ -1,0 +1,30 @@
+services:
+  openrgb:
+    # Sets the EVGA GTX 1080 Ti FTW3 LEDs: one static colour per zone, Nameplate (side logo) and
+    # Backplate. The card can't store a colour, so it is applied at every start and every 6 h.
+    # COLORS is "<nameplate>,<backplate>" in hex RRGGBB; 000000 = off (OpenRGB's "Off" mode does
+    # nothing on this card). Change it and `docker compose up -d`.
+    build: .
+    image: openrgb:1.0
+    container_name: openrgb
+    restart: unless-stopped
+    network_mode: none
+    environment:
+      - COLORS=000000,FFFFFF
+    # Least privilege: /dev is visible but only I2C devices (char major 89) may be opened, so OpenRGB
+    # can't reach USB/HID, e.g. the Corsair iCUE LINK hub that OpenLinkHub drives. On top of that,
+    # data/openrgb/OpenRGB.json disables every detector except "EVGA GeForce GTX 1080 Ti FTW3".
+    volumes:
+      - /dev:/dev
+      - /opt/docker/roxan/data/openrgb:/config
+      - /etc/localtime:/etc/localtime:ro
+    device_cgroup_rules:
+      - 'c 89:* rw'
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        while true; do
+          openrgb --config /config --device "EVGA GeForce GTX 1080 Ti FTW3" --mode direct --color "$$COLORS" 2>&1 | grep -v '^\[' || true
+          echo "$$(date '+%F %T') applied: nameplate,backplate = $$COLORS"
+          sleep 21600
+        done
