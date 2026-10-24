@@ -25,3 +25,20 @@ Already listed in Glance's Services monitor as reminders (they show as errors un
 `home.leonardonels.com` (Home Assistant) and `openai.leonardonels.com` (Open WebUI, presumably for
 the `ollama` container). For each: add `compose/<name>/`, a route in the Cloudflare tunnel (which
 also creates the DNS record), and a Glance docker-containers entry.
+
+## 3. Put the remaining public hostnames behind Cloudflare Access
+
+Tested on 2026-10-25 by requesting each public hostname from outside the tunnel: only `invoke-ai`
+and `sam3` redirected to the Cloudflare Access login. Still to put behind Access: `portainer`,
+`pi-hole`, `n8n`, `crafty` (admin tools, so far protected only by their own login).
+
+Intentionally open (see README, Cloudflared): `nextcloud`, `immich`, `vaultwarden` (apps can't pass
+Access), `floratech` (public demo), `glance`, `hot`, `scrutiny` (read-only dashboards). Recheck after
+adding the Access applications:
+
+```bash
+for h in portainer pi-hole n8n crafty; do
+  curl -s -o /dev/null -w "$h %{redirect_url}\n" https://$h.leonardonels.com/
+done   # protected ones redirect to <team>.cloudflareaccess.com
+```
+

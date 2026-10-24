@@ -1,6 +1,41 @@
-# Roxan Homelab
+# Roxan: a home server you can leave alone
 
-This repository contains the configuration and reference files for my personal homelab, `roxan`. It is based on an Ubuntu 24.04 LTS server running Docker. The typical deployment location on the server is `/opt/docker/roxan/`.
+A small home server (Ubuntu 24.04 + Docker Compose) set up to run unattended for months: it updates
+itself, rolls back updates that break things, repairs the usual failures on its own, and needs no
+ports opened on the router. This repository is the complete, working setup of my server `roxan`, shared as
+a template: take the parts you need, adapt the rest.
+
+## What's worth copying
+
+- **Unattended maintenance ([`scripts/`](scripts/README.md))**, independent of which services you run:
+  - weekly OS update that reboots only when needed and only into a kernel with a working GPU driver,
+    while pinning the NVIDIA driver branch
+  - weekly update of every running compose project: pull everything first, recreate only what
+    changed, **roll back** anything that doesn't come back healthy or loses the GPU
+  - a healthcheck every 5 minutes that restarts unhealthy containers, a hung Docker daemon or a dead
+    network, and survives the DNS server (Pi-hole) being down
+  - results in a [Glance](#glance) dashboard banner, optionally pushed to your phone (ntfy/Telegram)
+- **No ports opened on the router**: web services are published through a Cloudflare Tunnel (the
+  Minecraft server through playit), and the host itself is reached over Tailscale. On top of that,
+  [Cloudflare Access](#cloudflared) puts a login in front of every web service that has no reason to
+  be public. Secrets live in gitignored `.env` files.
+- **One folder per service**: `compose/<service>/` holds the compose file (and Dockerfile if any),
+  `data/<service>/` its persistent data. Each one starts with `docker compose up -d`.
+- **Problems documented in the open**: [`TODO-FIX.md`](TODO-FIX.md) lists what's still broken and how
+  it was diagnosed.
+
+## Using it for your own server
+
+1. Prepare Ubuntu, Docker and the NVIDIA toolkit as in [Initial Server Setup](#initial-server-setup-from-scratch).
+2. Clone to `/opt/docker/roxan`. The compose files use that absolute path; if you clone elsewhere,
+   search-and-replace it.
+3. Keep only the services you want from `compose/`. Services with an `.env.example` need a `.env`
+   (`cp .env.example .env`, then fill it in).
+4. Review [`scripts/roxan.conf`](scripts/roxan.conf): it is tuned for this box (Pi-hole address,
+   NVIDIA 580 branch for a Pascal GPU, disks, cooler). Then `sudo ./scripts/install.sh` and reboot.
+
+The hardware-specific parts (the NVIDIA driver pin, the Corsair cooler and EVGA GPU lighting) are
+optional: leave out what doesn't match your machine.
 
 ## Table of Contents
  - [System Specifications](#system-specifications)
@@ -34,10 +69,11 @@ Host: `roxan`
 ```text
 OS:     Ubuntu 24.04.4 LTS x86_64
 Host:   ITX-C246
-Kernel: 6.8.0-101-generic
+Kernel: 6.8.0-147-generic
 CPU:    Intel i3-8350K (4) @ 4.000GHz
 GPU 1:  Intel CoffeeLake-S GT2 [UHD Graphics 630]
-GPU 2:  NVIDIA GeForce RTX 2080 Ti Rev. A
+GPU 2:  NVIDIA GeForce GTX 1080 Ti (EVGA FTW3, Pascal)
+Cooler: Corsair iCUE LINK H100i (240 mm AIO)
 Memory: 32 GB (31990MiB)
 ```
 
@@ -138,6 +174,17 @@ Below is a brief description of each container/stack managed in this repository,
 ### Cloudflared
 Cloudflare Tunnel daemon, providing secure and fast connections to the local network without opening ports on the router.
 - **Image**: `cloudflare/cloudflared:latest`
+- **Routes**: configured in the Cloudflare Zero Trust dashboard (token-based tunnel), one public hostname per service.
+- **Cloudflare Access**: every hostname is behind an Access login (Cloudflare checks who you are before
+  the request ever reaches the server), with deliberate exceptions:
+  - **Nextcloud, Immich, Vaultwarden**: their mobile/desktop apps sync in the background and can't
+    pass an Access login, so they rely on their own authentication. Keep them updated and use strong
+    passwords + 2FA in the apps themselves.
+  - **FloraTech**: a public university demo project, meant to be open.
+  - **Glance, GPU Hot, Scrutiny**: read-only dashboards with nothing to log into and no actions to
+    trigger, so there is nothing to protect.
+  Everything that can change something (Portainer, Pi-hole, n8n, Crafty, InvokeAI, ...) must stay
+  behind Access.
 
 ### Crafty
 A control panel for managing Minecraft servers, allowing easy deployment and administration.
