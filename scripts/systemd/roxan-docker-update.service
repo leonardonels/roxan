@@ -8,6 +8,8 @@ Requires=docker.service
 [Service]
 Type=oneshot
 ExecStart=@ROXAN_ROOT@/scripts/docker-update.sh
+# Compose files expand `~` (e.g. invokeai's Hugging Face cache): without HOME it stays literal.
+Environment=HOME=@OWNER_HOME@
 Nice=10
 IOSchedulingClass=idle
 TimeoutStartSec=4h

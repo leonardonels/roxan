@@ -52,19 +52,25 @@ alone):
 1. **Pull everything first.** The host resolves DNS through Pi-hole, a container on this same box, so
    nothing is recreated until every download is done. Pulls are retried 3 times.
 2. **Rebuild** the projects in `DOCKER_REBUILD` with `build --pull`, so their base images stay current
-   (here: `invokeai`, whose Dockerfile re-installs a Pascal-capable PyTorch on each new release).
+   (here: `invokeai`, whose Dockerfile re-installs a Pascal-capable PyTorch on its pinned release).
    Builds are retried twice.
 3. **Recreate only what changed**, with `docker compose up --wait`. Changes are detected by image
    *content* (layers + config), because with the containerd image store every rebuild gets a new ID.
+   A container that exits and restarts on its own (Immich after a database migration) still gets
+   the rest of `DOCKER_WAIT_TIMEOUT` to settle as running/healthy before the update counts as failed.
 4. **GPU smoke test**: GPU containers must run a small CUDA matmul (or `nvidia-smi` if they have no
    PyTorch). This catches updates that look "Up" but can't use the GPU, like a PyTorch build without
    Pascal support.
 5. **Rollback**: a project that doesn't come back running/healthy, or fails the smoke test, goes back
    to the images it ran before. They are kept as `roxan-rollback:<project>-<n>` tags taken before
    pulling (the containerd store deletes an untagged image as soon as no container uses it), and the
-   rolled-back project must pass the smoke test again.
+   rolled-back project must pass the smoke test again. `DOCKER_NO_ROLLBACK` projects (Immich) are
+   never rolled back, because their first start migrates the database and the old version can't run
+   on it any more: they're reported as failed, with their last logs in the journal.
 6. Pi-hole and cloudflared are updated last. Nextcloud AIO updates itself through its own updater
-   (`/daily-backup.sh` with `AUTOMATIC_UPDATES=1`). GPU projects are skipped while the NVIDIA
+   (`/daily-backup.sh` with `AUTOMATIC_UPDATES=1`). If its mastercontainer can't reach Docker (a
+   Docker upgrade restarted dockerd and left it a dead socket) it's restarted first, and PHP fatal
+   errors in the updater's output count as a failure. GPU projects are skipped while the NVIDIA
    driver/library versions don't match (until the next reboot).
 7. Dangling images and build cache older than 30 days are pruned.
 
@@ -112,10 +118,20 @@ Installs the timers and, from `etc/`:
 
 ## Glance banner and notifications
 
-Each script writes its section of `data/glance/assets/roxan-status.json` (gitignored), which Glance
-serves and the **Roxan maintenance** widget in `data/glance/config/glance.yml` renders: docker update
-(updated / up to date / rolled back / failed / skipped), system update (kernel, NVIDIA loaded vs
-installed, pending reboot, problems, last automatic reboot) and health (issues, uptime, last repair).
+Each script writes its section of the full report, `/var/lib/roxan/report.json`, which stays on the
+host. From it, `data/glance/assets/roxan-status.json` (gitignored) is regenerated with **states and
+counts only**, because Glance serves it to anyone who can open the dashboard. The **Roxan
+maintenance** widget in `data/glance/config/glance.yml` renders it: docker update (how many updated /
+up to date / rolled back / failed / skipped), system update (packages, problems, pending reboot, GPU
+driver mismatch, last automatic reboot) and health (issues, uptime, when the last repair happened).
+
+To see *what* failed or was repaired, log in to the host and run:
+
+```bash
+/opt/docker/roxan/scripts/report.sh        # full report + warnings from the last 7 days of journal
+/opt/docker/roxan/scripts/report.sh -1d    # journal window
+/opt/docker/roxan/scripts/report.sh --json # raw report
+```
 
 With `NTFY_URL` and/or `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID` in `roxan.env`, you also get:
 
@@ -136,6 +152,7 @@ Everything lives in [`roxan.conf`](roxan.conf). The values you will most likely 
 |---|---|
 | `DNS_SERVERS` | resolvers for containers: your Pi-hole first, a public one after |
 | `DOCKER_SKIP` / `DOCKER_REBUILD` / `DOCKER_LAST` | projects never touched / rebuilt weekly / updated last |
+| `DOCKER_NO_ROLLBACK`, `DOCKER_WAIT_TIMEOUT` | projects never rolled back (DB migrations), seconds to come up healthy |
 | `NEXTCLOUD_AIO_PROJECT` | compose folder of Nextcloud AIO, empty if you don't run it |
 | `NVIDIA_BRANCH`, `AUTO_REBOOT`, `REBOOT_MIN_INTERVAL_H` | driver branch to stay on, reboot policy |
 | `PING_HOSTS`, `NET_RESTART_AFTER`, `NET_REBOOT_AFTER` | connectivity check and its escalation |
@@ -152,7 +169,7 @@ systemctl list-timers 'roxan-*'
 journalctl -u roxan-docker-update -u roxan-system-update -u roxan-healthcheck --since -7d
 ```
 
-The scripts honour `ROXAN_CONF`, `STATE_DIR` and `STATUS_FILE`, so they can be tried without root
+The scripts honour `ROXAN_CONF`, `STATE_DIR`, `REPORT_FILE` and `STATUS_FILE`, so they can be tried without root
 and without touching the real state, e.g. `STATE_DIR=/tmp/x STATUS_FILE=/tmp/x/s.json
 ./scripts/healthcheck.sh`, or a `ROXAN_CONF` that sources `roxan.conf` and points `COMPOSE_DIR` at a
 throwaway project (that's how the rollback and smoke test were tested).

@@ -219,7 +219,7 @@ A very fast, self-hosted photo and video backup solution directly from your mobi
 ### InvokeAI
 A powerful creative engine for Stable Diffusion models, providing a UI for AI image generation.
 - **Image**: Custom (`build: .`)
-- **Dockerfile contents**: `ghcr.io/invoke-ai/invokeai:latest` with its torch/torchvision reinstalled from PyTorch's cu126 index (same versions), since the official CUDA 12.8 build doesn't support the Pascal GTX 1080 Ti. Rebuilt by the weekly docker update.
+- **Dockerfile contents**: `ghcr.io/invoke-ai/invokeai:v6.14.2-cuda` (pinned: `latest` follows the main branch and its alphas) with its torch/torchvision reinstalled from PyTorch's cu126 index (same versions), since the official CUDA 12.8 build doesn't support the Pascal GTX 1080 Ti. Rebuilt by the weekly docker update; bump the tag in the Dockerfile for a new release.
 
 ### n8n
 An extendable workflow automation tool for connecting different services and APIs.

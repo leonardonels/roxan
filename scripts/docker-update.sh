@@ -5,7 +5,7 @@
 #   2. recreate only the projects whose images changed and wait for them to be healthy; GPU
 #      containers must also pass a CUDA smoke test,
 #   3. if a project doesn't come back or fails that test, re-tag the images it was running
-#      before and bring it up again (rollback),
+#      before and bring it up again (rollback), except for DOCKER_NO_ROLLBACK projects,
 #   4. let Nextcloud AIO update itself through its own updater.
 # Results go to the journal, to the Glance status file and (optionally) to ntfy/Telegram.
 #
@@ -28,7 +28,7 @@ declare -A services snapshot
 started="$(now_iso)"
 start_s=$(date +%s)
 
-((CHECK)) || status_set docker "$(jq -nc --arg t "$started" '{state: "running", started: $t}')"
+((CHECK || GPU_TEST)) || status_set docker "$(jq -nc --arg t "$started" '{state: "running", started: $t}')"
 
 dc() {
   local project="$1"
@@ -109,10 +109,30 @@ gpu_smoke_test() {
   done
 }
 
+# One "<status>/<health>/<restart count>" line per container of the given services.
+services_state() {
+  dc "$1" ps -aq "${@:2}" | xargs -r docker inspect -f \
+    '{{.State.Status}}/{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}/{{.RestartCount}}'
+}
+
+# `up --wait` gives up as soon as a container exits, but some restart once on their own and then
+# come up fine (Immich after migrating its database): keep polling until the timeout, and only
+# accept a state that is running/healthy and unchanged (no new restart) over two polls.
 bring_up() {
   local -a svc
+  local deadline=$((SECONDS + DOCKER_WAIT_TIMEOUT)) state prev=""
   read -ra svc <<<"${services[$1]}"
-  dc "$1" up -d --no-build --wait --wait-timeout "$DOCKER_WAIT_TIMEOUT" "${svc[@]}"
+  dc "$1" up -d --no-build --wait --wait-timeout "$DOCKER_WAIT_TIMEOUT" "${svc[@]}" && return 0
+  ((SECONDS < deadline)) && log "   $1: not up yet, waiting in case it restarts on its own"
+  while ((SECONDS < deadline)); do
+    sleep 15
+    state="$(services_state "$1" "${svc[@]}")"
+    if [[ -n "$state" ]] && ! grep -qvE '^running/(healthy|none)/' <<<"$state"; then
+      [[ "$state" == "$prev" ]] && return 0
+    fi
+    prev="$state"
+  done
+  return 1
 }
 
 rollback() {
@@ -125,7 +145,7 @@ rollback() {
 }
 
 update_nextcloud_aio() {
-  local master=nextcloud-aio-mastercontainer before after i
+  local master=nextcloud-aio-mastercontainer before after i aio_errors
   if ! docker ps --format '{{.Names}}' | grep -qx "$master"; then
     skipped+=("$NEXTCLOUD_AIO_PROJECT (not running)")
     return
@@ -139,11 +159,35 @@ update_nextcloud_aio() {
     return
   fi
   aio_images() { docker ps -q --filter name=nextcloud-aio- | xargs -r docker inspect -f '{{.Name}} {{.Image}}' | sort; }
-  before="$(aio_images)"
+  aio_docker() { docker exec "$master" docker info >/dev/null 2>&1; }
+  # The updater prints PHP fatal errors but still exits 0, so its output is checked too.
+  aio_updater() {
+    local out rc
+    out="$(timeout 3600 docker exec --env AUTOMATIC_UPDATES=1 "$master" /daily-backup.sh 2>&1)"
+    rc=$?
+    printf '%s\n' "$out"
+    grep -q 'Fatal error' <<<"$out" && aio_errors=1
+    return "$rc"
+  }
   log "== $NEXTCLOUD_AIO_PROJECT: running the AIO updater"
+  # The mastercontainer bind-mounts /var/run/docker.sock: when dockerd restarts (a Docker upgrade
+  # in system-update.sh) it keeps the old, dead socket until the container itself is restarted.
+  if ! aio_docker; then
+    log "   $master can't reach Docker (stale socket after a dockerd restart), restarting it"
+    docker restart "$master" >/dev/null
+    for ((i = 0; i < 40; i++)); do
+      aio_docker && break
+      sleep 15
+    done
+    if ! aio_docker; then
+      failed+=("$NEXTCLOUD_AIO_PROJECT (mastercontainer can't reach Docker)")
+      return
+    fi
+  fi
+  before="$(aio_images)" aio_errors=0
   # Same procedure as the AIO docs: if the mastercontainer updates itself the exec gets cut
   # off; wait for it to come back and run the updater once more for the other containers.
-  if ! timeout 3600 docker exec --env AUTOMATIC_UPDATES=1 "$master" /daily-backup.sh; then
+  if ! aio_updater; then
     for ((i = 0; i < 60; i++)); do
       docker ps --format '{{.Names}}' | grep -qx nextcloud-aio-watchtower || break
       sleep 30
@@ -152,7 +196,8 @@ update_nextcloud_aio() {
       docker ps --format '{{.Names}}' | grep -qx "$master" && break
       sleep 30
     done
-    timeout 3600 docker exec --env AUTOMATIC_UPDATES=1 "$master" /daily-backup.sh
+    aio_errors=0
+    aio_updater
   fi
   # The updater doesn't report failures, so check the result ourselves.
   for ((i = 0; i < 40; i++)); do
@@ -162,6 +207,8 @@ update_nextcloud_aio() {
   after="$(aio_images)"
   if [[ "$(docker inspect -f '{{.State.Health.Status}}' nextcloud-aio-apache 2>/dev/null)" != healthy ]]; then
     failed+=("$NEXTCLOUD_AIO_PROJECT (apache not healthy after AIO update)")
+  elif ((aio_errors)); then
+    failed+=("$NEXTCLOUD_AIO_PROJECT (AIO updater errors, see journal)")
   elif [[ "$before" != "$after" ]]; then
     updated+=("$NEXTCLOUD_AIO_PROJECT")
   else
@@ -242,8 +289,14 @@ for p in "${pending[@]}"; do
     updated+=("$p")
     continue
   fi
-  warn "$p did not come back healthy or failed the GPU check, rolling back"
   dc "$p" ps -a
+  dc "$p" logs --no-color --tail 30
+  if in_list "$p" "${DOCKER_NO_ROLLBACK[@]}"; then
+    warn "$p did not come back healthy or failed the GPU check, NOT rolling back (DOCKER_NO_ROLLBACK)"
+    failed+=("$p (unhealthy after update, not rolled back)")
+    continue
+  fi
+  warn "$p did not come back healthy or failed the GPU check, rolling back"
   if rollback "$p" && gpu_smoke_test "$p"; then
     rolled_back+=("$p")
   else

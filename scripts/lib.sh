@@ -9,7 +9,10 @@ source "${ROXAN_CONF:-$SCRIPTS_DIR/roxan.conf}"
 [[ -f "$SCRIPTS_DIR/roxan.env" ]] && source "$SCRIPTS_DIR/roxan.env"
 
 STATE_DIR="${STATE_DIR:-/var/lib/roxan}"
+# Full report (which projects, packages, issues, repairs): only on the host, read with report.sh.
+REPORT_FILE="${REPORT_FILE:-$STATE_DIR/report.json}"
 # Served by Glance at /assets/roxan-status.json and rendered by the "Roxan" widget in glance.yml.
+# Anyone who can open the dashboard can read it, so it only gets states and counts (public_status).
 STATUS_FILE="${STATUS_FILE:-$ROXAN_ROOT/data/glance/assets/roxan-status.json}"
 STATUS_OWNER="$(stat -c %U:%G "$ROXAN_ROOT")"
 mkdir -p "$STATE_DIR"
@@ -48,16 +51,38 @@ maintenance_lock() {
   flock -w "${1:-7200}" 8
 }
 
-# status_set <section> <json-object>: merge the object into .<section> of the status file.
+# What the report becomes in the public status file: states, times and counts, no names.
+public_status() {
+  jq '
+    def n(a): (a // []) | length;
+    {updated_at}
+    + (if .docker then {docker: (.docker | {state, started, finished, duration_s,
+        updated: n(.updated), current: n(.current), rolled_back: n(.rolled_back),
+        failed: n(.failed), skipped: n(.skipped)})} else {} end)
+    + (if .system then {system: (.system | {state, started, finished,
+        packages: n(.upgraded), problems: n(.problems),
+        reboot_pending: ((.reboot_pending // "") != ""),
+        driver_mismatch: ((.nvidia_loaded // "") != (.nvidia_installed // ""))})} else {} end)
+    + (if .health then {health: (.health | {state, checked, uptime, issues: n(.issues),
+        reboot_required, last_repair, repairs: n(.last_repair_actions)})} else {} end)
+    + (if .reboot then {reboot: {at: .reboot.at}} else {} end)'
+}
+
+# status_set <section> <json-object>: merge the object into .<section> of the report, then
+# rewrite the public status file from it.
 status_set() {
   local section="$1" json="$2"
   (
     flock -w 30 9 || exit 1
     local tmp
     tmp="$(mktemp "$STATE_DIR/status.XXXXXX")"
-    { jq -e 'type == "object"' "$STATUS_FILE" >/dev/null 2>&1 && cat "$STATUS_FILE" || echo '{}'; } |
+    # The status file used to hold the full report: start from it the first time.
+    [[ -f "$REPORT_FILE" ]] || cp "$STATUS_FILE" "$REPORT_FILE" 2>/dev/null
+    { jq -e 'type == "object"' "$REPORT_FILE" >/dev/null 2>&1 && cat "$REPORT_FILE" || echo '{}'; } |
       jq --arg s "$section" --argjson v "$json" --arg t "$(now_iso)" \
         '.[$s] = ((.[$s] // {}) + $v) | .updated_at = $t' >"$tmp" &&
+      install -m 644 "$tmp" "$REPORT_FILE" &&
+      public_status <"$REPORT_FILE" >"$tmp" &&
       install -m 644 "$tmp" "$STATUS_FILE" &&
       chown "$STATUS_OWNER" "$STATUS_FILE" 2>/dev/null
     rm -f "$tmp"

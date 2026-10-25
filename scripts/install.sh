@@ -99,9 +99,12 @@ fi
 chmod 600 "$SCRIPTS_DIR/roxan.env"
 
 echo "== systemd units"
+# HOME of the repo owner, so `~` in compose files means the same as when they run compose by hand.
+owner_home="$(getent passwd "$(stat -c %U "$ROXAN_ROOT")" | cut -d: -f6)"
 for u in "${UNITS[@]}"; do
   for ext in service timer; do
-    sed "s|@ROXAN_ROOT@|$ROXAN_ROOT|g" "$SCRIPTS_DIR/systemd/$u.$ext" >"/etc/systemd/system/$u.$ext"
+    sed -e "s|@ROXAN_ROOT@|$ROXAN_ROOT|g" -e "s|@OWNER_HOME@|$owner_home|g" \
+      "$SCRIPTS_DIR/systemd/$u.$ext" >"/etc/systemd/system/$u.$ext"
   done
 done
 systemctl daemon-reload
